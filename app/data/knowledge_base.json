@@ -1,0 +1,52 @@
+{
+  "password_reset": {
+    "keywords": ["password", "login", "forgot", "reset", "can't log", "access", "sign in", "locked out"],
+    "answer": "To reset your password: Go to the login page and click 'Forgot Password'. Enter your registered email address. Check your inbox (and spam/junk folder) for a reset link — it expires in 30 minutes. If you still don't receive it, check that you're using the email address registered with your account.",
+    "category": "account"
+  },
+  "shipping_policy": {
+    "keywords": ["shipping", "delivery", "arrive", "when", "order status", "how long", "track", "transit"],
+    "answer": "Standard delivery: 5-7 business days. Express delivery: 1-2 business days. International: 10-14 business days. You can track your order at orders.example.com using your order ID. Delivery times start from the day of dispatch, not order placement.",
+    "category": "shipping"
+  },
+  "refund_policy": {
+    "keywords": ["refund", "return", "money back", "cancel", "charge", "reimbursement", "reimburse"],
+    "answer": "We offer full refunds within 30 days of purchase for: (1) defective items, (2) items not received, (3) items significantly different from description. Partial refunds (50%) for change-of-mind returns. To initiate a refund, provide your order ID and a brief reason. Refunds appear in 3-5 business days.",
+    "category": "refund"
+  },
+  "account_deletion": {
+    "keywords": ["delete account", "close account", "remove account", "deactivate", "gdpr"],
+    "answer": "To delete your account: Go to Settings > Privacy > Delete Account. This is permanent and will erase all your data within 30 days per GDPR. If you want to just pause your account, choose 'Deactivate' instead. Existing orders will still be fulfilled even after deletion.",
+    "category": "account"
+  },
+  "payment_methods": {
+    "keywords": ["payment", "pay", "credit card", "debit", "upi", "wallet", "billing"],
+    "answer": "We accept: Visa, Mastercard, American Express, PayPal, UPI, and most major digital wallets. All transactions are encrypted with 256-bit SSL. We do not store full card numbers. For failed payments, check if your card has international transactions enabled.",
+    "category": "payment"
+  },
+  "order_cancellation": {
+    "keywords": ["cancel order", "stop order", "cancel purchase", "undo order"],
+    "answer": "Orders can be cancelled within 1 hour of placement if not yet dispatched. After dispatch, cancellation is not possible but you can initiate a return once received. To cancel, go to Orders > Select Order > Cancel. You'll receive a full refund within 3-5 business days.",
+    "category": "orders"
+  },
+  "warranty": {
+    "keywords": ["warranty", "guarantee", "broken", "defective", "malfunction", "stopped working", "faulty"],
+    "answer": "All products come with a 1-year manufacturer warranty covering defects. For warranty claims: (1) Contact us within the warranty period, (2) Provide order ID and photos/video of the defect, (3) We'll arrange free pickup and replacement within 7 business days.",
+    "category": "warranty"
+  },
+  "duplicate_charge": {
+    "keywords": ["charged twice", "double charge", "duplicate charge", "extra charge", "wrong amount"],
+    "answer": "Duplicate charges sometimes appear as pending transactions that auto-resolve in 24-48 hours. If the duplicate charge is still present after 48 hours: (1) Screenshot your bank statement, (2) Provide us the order ID and charge dates, (3) We'll investigate and refund within 3 business days.",
+    "category": "payment"
+  },
+  "product_availability": {
+    "keywords": ["out of stock", "available", "when restock", "back in stock", "sold out"],
+    "answer": "Out-of-stock items typically restock within 7-14 days. Click 'Notify Me' on the product page to get an email when it's available. If you need it urgently, contact us and we can check our regional warehouses for faster fulfillment.",
+    "category": "products"
+  },
+  "contact_support": {
+    "keywords": ["contact", "speak to human", "talk to agent", "call", "phone", "email support"],
+    "answer": "You can reach us via: Live Chat (Mon-Fri 9am-6pm IST), Email at support@example.com (response within 24hrs), or Phone at +91-1800-XXX-XXXX (Mon-Fri 9am-5pm IST). For urgent issues involving safety or fraud, phone is recommended.",
+    "category": "support"
+  }
+}

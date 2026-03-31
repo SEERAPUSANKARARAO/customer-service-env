@@ -1,0 +1,67 @@
+name: customer-service-env
+version: "1.0.0"
+description: >
+  A multi-task OpenEnv environment simulating a real-world AI customer support agent.
+  The agent resolves support tickets by calling tools (search KB, check orders,
+  send replies, issue refunds, escalate) across three difficulty levels.
+  Demonstrates tool-use, multi-turn reasoning, empathy, and safe escalation decisions.
+author: sankara
+license: MIT
+
+tasks:
+  - id: easy
+    name: FAQ / Password Reset
+    description: >
+      Resolve a simple password reset or FAQ ticket in ≤5 steps.
+      Agent must search the knowledge base and send a correct, helpful reply.
+    max_steps: 5
+    reward_threshold: 0.7
+
+  - id: medium
+    name: Missing Order Investigation
+    description: >
+      Customer's order hasn't arrived. Agent must ask for the order ID,
+      check order details via API, then communicate the correct status and next steps.
+    max_steps: 8
+    reward_threshold: 0.7
+
+  - id: hard
+    name: Angry Refund with Escalation Decision
+    description: >
+      Angry customer demanding a refund for a lost item. Agent must de-escalate,
+      verify the order, issue the correct refund amount, and decide on escalation.
+      Tests empathy, tool orchestration, and policy adherence.
+    max_steps: 10
+    reward_threshold: 0.7
+
+api:
+  reset: /reset
+  step: /step
+  state: /state
+  health: /health
+
+observation_space:
+  type: dict
+  fields:
+    - ticket: object
+    - conversation: array
+    - available_tools: array
+    - step_count: integer
+    - done: boolean
+    - reward: float
+    - tool_result: object
+    - info: object
+
+action_space:
+  type: dict
+  fields:
+    - tool: string
+    - params: object
+
+reward_range: [0.0, 1.0]
+reward_type: partial_progress
+
+runtime:
+  max_inference_minutes: 20
+  min_vcpu: 2
+  min_ram_gb: 8

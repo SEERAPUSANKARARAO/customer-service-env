@@ -1,0 +1,140 @@
+{
+  "easy": [
+    {
+      "id": "TKT-E001",
+      "subject": "Can't log into my account",
+      "description": "I forgot my password and the reset email isn't arriving. I've waited 30 minutes.",
+      "customer_info": {"name": "Priya Sharma", "email": "priya.sharma@example.com", "tier": "regular"},
+      "expected_kb_key": "password_reset",
+      "expected_tools": ["search_kb", "send_reply", "close_ticket"]
+    },
+    {
+      "id": "TKT-E002",
+      "subject": "How do I cancel my order?",
+      "description": "I just placed an order 20 minutes ago and want to cancel it. Is that possible?",
+      "customer_info": {"name": "Amit Verma", "email": "amit.verma@example.com", "tier": "regular"},
+      "expected_kb_key": "order_cancellation",
+      "expected_tools": ["search_kb", "send_reply", "close_ticket"]
+    },
+    {
+      "id": "TKT-E003",
+      "subject": "What payment methods do you accept?",
+      "description": "I want to pay using UPI but not sure if you accept it.",
+      "customer_info": {"name": "Sneha Rao", "email": "sneha.rao@example.com", "tier": "regular"},
+      "expected_kb_key": "payment_methods",
+      "expected_tools": ["search_kb", "send_reply", "close_ticket"]
+    },
+    {
+      "id": "TKT-E004",
+      "subject": "Is my product still under warranty?",
+      "description": "I bought a laptop stand 8 months ago and it stopped working. Is it still covered?",
+      "customer_info": {"name": "Kiran Patel", "email": "kiran.patel@example.com", "tier": "regular"},
+      "expected_kb_key": "warranty",
+      "expected_tools": ["search_kb", "send_reply", "close_ticket"]
+    },
+    {
+      "id": "TKT-E005",
+      "subject": "How do I delete my account?",
+      "description": "I want to delete my account permanently. Can you tell me how?",
+      "customer_info": {"name": "Fatima Sheikh", "email": "fatima.s@example.com", "tier": "regular"},
+      "expected_kb_key": "account_deletion",
+      "expected_tools": ["search_kb", "send_reply", "close_ticket"]
+    },
+    {
+      "id": "TKT-E006",
+      "subject": "I see a duplicate charge on my card",
+      "description": "I was charged twice for the same order yesterday. Please help.",
+      "customer_info": {"name": "Rohan Das", "email": "rohan.das@example.com", "tier": "regular"},
+      "expected_kb_key": "duplicate_charge",
+      "expected_tools": ["search_kb", "send_reply", "close_ticket"]
+    }
+  ],
+  "medium": [
+    {
+      "id": "TKT-M001",
+      "subject": "Haven't received my order",
+      "description": "It's been 2 weeks and my order still hasn't arrived. This is ridiculous.",
+      "customer_info": {"name": "Arjun Mehta", "email": "arjun.mehta@example.com", "tier": "regular"},
+      "order_to_find": "ORD-1002",
+      "expected_tools": ["ask_clarification", "get_order_details", "send_reply", "close_ticket"]
+    },
+    {
+      "id": "TKT-M002",
+      "subject": "Order tracking not updating",
+      "description": "My tracking page hasn't updated in 5 days. Don't know where my package is.",
+      "customer_info": {"name": "Divya Krishnan", "email": "divya.k@example.com", "tier": "premium"},
+      "order_to_find": "ORD-1004",
+      "expected_tools": ["ask_clarification", "get_order_details", "send_reply", "update_ticket", "close_ticket"]
+    },
+    {
+      "id": "TKT-M003",
+      "subject": "Wrong item delivered",
+      "description": "I ordered a USB Hub but received a completely different product. This is unacceptable.",
+      "customer_info": {"name": "Suresh Iyer", "email": "suresh.iyer@example.com", "tier": "regular"},
+      "order_to_find": "ORD-1002",
+      "expected_tools": ["ask_clarification", "get_order_details", "send_reply", "update_ticket", "close_ticket"]
+    },
+    {
+      "id": "TKT-M004",
+      "subject": "My order is showing delivered but I never got it",
+      "description": "The tracking says delivered 3 days ago but nothing arrived at my address.",
+      "customer_info": {"name": "Lakshmi Naidu", "email": "lakshmi.n@example.com", "tier": "regular"},
+      "order_to_find": "ORD-1001",
+      "expected_tools": ["ask_clarification", "get_order_details", "send_reply", "close_ticket"]
+    },
+    {
+      "id": "TKT-M005",
+      "subject": "Need to change delivery address",
+      "description": "I placed an order yesterday but need to change the delivery address. Is it too late?",
+      "customer_info": {"name": "Vikram Singh", "email": "vikram.singh@example.com", "tier": "regular"},
+      "order_to_find": "ORD-1002",
+      "expected_tools": ["ask_clarification", "get_order_details", "send_reply", "close_ticket"]
+    }
+  ],
+  "hard": [
+    {
+      "id": "TKT-H001",
+      "subject": "DEMAND REFUND NOW - Charged twice for broken item!!!",
+      "description": "I was charged TWICE for a webcam that arrived completely broken. I want a FULL REFUND IMMEDIATELY or I'm reporting you to consumer court and posting on social media.",
+      "customer_info": {"name": "Rahul Kapoor", "email": "rahul.kapoor@example.com", "tier": "regular"},
+      "order_id": "ORD-1003",
+      "sentiment": "angry",
+      "correct_refund_amount": 79.99,
+      "should_escalate": false,
+      "expected_tools": ["get_order_details", "issue_refund", "send_reply", "close_ticket"]
+    },
+    {
+      "id": "TKT-H002",
+      "subject": "Absolute scam - product never delivered, no response for weeks",
+      "description": "I ordered 3 weeks ago. Nothing arrived. No one is helping me. I've sent 4 emails. This is FRAUD. I will be filing a complaint with the authorities.",
+      "customer_info": {"name": "Meera Nair", "email": "meera.nair@example.com", "tier": "premium"},
+      "order_id": "ORD-1005",
+      "sentiment": "very_angry",
+      "correct_refund_amount": 149.99,
+      "should_escalate": true,
+      "expected_tools": ["get_order_details", "issue_refund", "send_reply", "escalate_to_human", "close_ticket"]
+    },
+    {
+      "id": "TKT-H003",
+      "subject": "Threatening legal action over defective product",
+      "description": "The keyboard I bought stopped working after 2 days. I am a lawyer and will be taking legal action if this is not resolved TODAY. I want a full refund and compensation.",
+      "customer_info": {"name": "Aditya Sharma", "email": "aditya.sharma@example.com", "tier": "regular"},
+      "order_id": "ORD-1004",
+      "sentiment": "angry",
+      "correct_refund_amount": 89.99,
+      "should_escalate": true,
+      "expected_tools": ["get_order_details", "send_reply", "escalate_to_human", "close_ticket"]
+    },
+    {
+      "id": "TKT-H004",
+      "subject": "This is outrageous - refund me NOW or I go to the media",
+      "description": "My webcam was marked as lost. I need my money back immediately. I have 50K followers and will post about this if not resolved in the next hour.",
+      "customer_info": {"name": "Zara Khan", "email": "zara.khan@example.com", "tier": "regular"},
+      "order_id": "ORD-1003",
+      "sentiment": "angry",
+      "correct_refund_amount": 79.99,
+      "should_escalate": false,
+      "expected_tools": ["get_order_details", "issue_refund", "send_reply", "close_ticket"]
+    }
+  ]
+}
