@@ -8,7 +8,7 @@ class Action(BaseModel):
 
 
 class ResetRequest(BaseModel):
-    task_id: str = Field(..., description="Task difficulty: 'easy' | 'medium' | 'hard'")
+    task_id: Optional[str] = Field("easy", description="Task difficulty: 'easy' | 'medium' | 'hard'")
     seed: Optional[int] = Field(None, description="Random seed for reproducibility")
 
 

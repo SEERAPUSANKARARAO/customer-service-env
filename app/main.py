@@ -4,7 +4,7 @@ FastAPI server exposing the OpenEnv API: /reset, /step, /state, /health.
 Runs on port 7860 for Hugging Face Spaces.
 """
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import uvicorn
@@ -43,15 +43,22 @@ env = CustomerServiceEnv()
 # ---------------------------------------------------------------------------
 
 @app.post("/reset", summary="Start a new episode")
-def reset(req: ResetRequest):
+async def reset(request: Request):
     """
     Initialize a new episode.
-    - task_id: "easy" | "medium" | "hard"
+    - task_id: "easy" | "medium" | "hard"  (default: "easy")
     - seed: optional int for reproducibility
     Returns the first observation.
     """
     try:
-        obs = env.reset(task_id=req.task_id, seed=req.seed)
+        body = {}
+        try:
+            body = await request.json()
+        except Exception:
+            pass  # empty body is fine — use defaults
+        task_id = body.get("task_id", "easy") if body else "easy"
+        seed = body.get("seed", None) if body else None
+        obs = env.reset(task_id=task_id, seed=seed)
         return JSONResponse(content=obs)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
