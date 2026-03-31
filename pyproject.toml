@@ -17,7 +17,11 @@ dependencies = [
     "python-dotenv>=1.0.0",
     "groq>=0.9.0",
     "openai>=1.0.0",
+    "openenv-core>=0.2.0",
 ]
+
+[project.scripts]
+server = "server.app:main"
 
 [project.urls]
 Homepage = "https://huggingface.co/spaces/cop91/Customer-Service-Agents-OpenEnv"
@@ -25,4 +29,4 @@ Repository = "https://github.com/SEERAPUSANKARARAO/customer-service-env"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["app*"]
+include = ["app*", "server*"]
