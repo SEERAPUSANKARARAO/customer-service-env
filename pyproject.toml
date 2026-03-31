@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "customer-service-env"
+version = "1.0.0"
+description = "A real-world OpenEnv environment for training AI customer support agents"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi>=0.110.0",
+    "uvicorn[standard]>=0.29.0",
+    "pydantic>=2.0.0",
+    "requests>=2.31.0",
+    "python-dotenv>=1.0.0",
+    "groq>=0.9.0",
+    "openai>=1.0.0",
+]
+
+[project.urls]
+Homepage = "https://huggingface.co/spaces/cop91/Customer-Service-Agents-OpenEnv"
+Repository = "https://github.com/SEERAPUSANKARARAO/customer-service-env"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["app*"]
