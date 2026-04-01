@@ -38,14 +38,16 @@ except ImportError:
     pass  # fine — just use real environment variables
 
 # ---------------------------------------------------------------------------
-# Native Groq client
+# OpenAI client (pointed at Groq's OpenAI-compatible endpoint)
 # ---------------------------------------------------------------------------
 try:
-    from groq import Groq, RateLimitError, APIStatusError
+    from openai import OpenAI, RateLimitError, APIStatusError
 except ImportError:
-    print("\n  [ERROR] The 'groq' package is not installed.")
-    print("  Fix: pip install groq\n")
+    print("\n  [ERROR] The 'openai' package is not installed.")
+    print("  Fix: pip install openai\n")
     sys.exit(1)
+
+GROQ_BASE_URL = "https://api.groq.com/openai/v1"
 
 
 # ===========================================================================
@@ -79,7 +81,7 @@ class GroqKeyRotator:
             print("  Get keys at: https://console.groq.com/keys\n")
             sys.exit(1)
 
-        self._clients = [Groq(api_key=k) for k in self.keys]
+        self._clients = [OpenAI(api_key=k, base_url=GROQ_BASE_URL) for k in self.keys]
         self._index   = 0
 
         print(f"  [Groq] {len(self.keys)} key(s) loaded.")
@@ -87,7 +89,7 @@ class GroqKeyRotator:
             print(f"         key {i+1}: {k[:8]}...{k[-4:]}")
 
     @property
-    def client(self) -> Groq:
+    def client(self) -> OpenAI:
         return self._clients[self._index]
 
     def rotate(self):
