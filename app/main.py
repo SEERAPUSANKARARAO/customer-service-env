@@ -10,7 +10,7 @@ from fastapi.responses import JSONResponse
 import uvicorn
 
 from app.env import CustomerServiceEnv
-from app.models import Action, ResetRequest
+from app.models import Action
 
 # ---------------------------------------------------------------------------
 # App setup
@@ -100,8 +100,61 @@ def get_state():
 
 @app.get("/health", summary="Health check")
 def health():
-    """Required by HF Spaces for the deployment ping."""
-    return {"status": "ok", "env": "customer-service-env", "version": "1.0.0"}
+    """Required by OpenEnv validator and HF Spaces."""
+    return {"status": "healthy", "env": "customer-service-env", "version": "1.0.0"}
+
+
+@app.get("/metadata", summary="Environment metadata")
+def metadata():
+    """Required by OpenEnv runtime validation."""
+    return {
+        "name": "Customer Service OpenEnv",
+        "description": (
+            "A real-world OpenEnv environment for training AI customer support agents. "
+            "Three task difficulties: easy (FAQ), medium (missing order), hard (angry refund)."
+        ),
+        "version": "1.0.0",
+        "tasks": ["easy", "medium", "hard"],
+        "reward_range": [0.0, 1.0],
+    }
+
+
+@app.get("/schema", summary="Action and observation schemas")
+def schema():
+    """Required by OpenEnv runtime validation."""
+    return {
+        "action": {
+            "type": "object",
+            "properties": {
+                "tool": {"type": "string", "description": "Tool name to call"},
+                "params": {"type": "object", "description": "Tool parameters"},
+            },
+            "required": ["tool"],
+        },
+        "observation": {
+            "type": "object",
+            "properties": {
+                "ticket": {"type": "object"},
+                "conversation": {"type": "array"},
+                "available_tools": {"type": "array"},
+                "step_count": {"type": "integer"},
+                "done": {"type": "boolean"},
+                "reward": {"type": "number"},
+                "tool_result": {"type": "object"},
+                "info": {"type": "object"},
+            },
+        },
+        "state": {
+            "type": "object",
+            "properties": {
+                "task_id": {"type": "string"},
+                "seed": {"type": "integer"},
+                "step_count": {"type": "integer"},
+                "done": {"type": "boolean"},
+                "score": {"type": "number"},
+            },
+        },
+    }
 
 
 @app.get("/", summary="Environment info")

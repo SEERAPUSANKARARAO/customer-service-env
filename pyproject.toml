@@ -1,15 +1,14 @@
 [build-system]
-requires = ["setuptools>=68.0", "wheel"]
-build-backend = "setuptools.backends.legacy:build"
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
 
 [project]
-name = "customer-service-env"
+name = "openenv-customer-service-env"
 version = "1.0.0"
-description = "A real-world OpenEnv environment for training AI customer support agents"
-readme = "README.md"
-license = { text = "MIT" }
+description = "Customer Service environment for OpenEnv"
 requires-python = ">=3.10"
 dependencies = [
+    "openenv-core[core]>=0.2.0",
     "fastapi>=0.110.0",
     "uvicorn[standard]>=0.29.0",
     "pydantic>=2.0.0",
@@ -17,16 +16,21 @@ dependencies = [
     "python-dotenv>=1.0.0",
     "groq>=0.9.0",
     "openai>=1.0.0",
-    "openenv-core>=0.2.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
 ]
 
 [project.scripts]
-server = "server.app:main"
+server = "customer_service_env.server.app:main"
 
 [project.urls]
 Homepage = "https://huggingface.co/spaces/cop91/Customer-Service-Agents-OpenEnv"
 Repository = "https://github.com/SEERAPUSANKARARAO/customer-service-env"
 
-[tool.setuptools.packages.find]
-where = ["."]
-include = ["app*", "server*"]
+[tool.setuptools]
+include-package-data = true
+packages = ["customer_service_env", "customer_service_env.server"]
+package-dir = { "customer_service_env" = ".", "customer_service_env.server" = "server" }

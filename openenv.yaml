@@ -1,5 +1,10 @@
+spec_version: 1
 name: customer-service-env
-version: "1.0.0"
+type: space
+framework: fastapi
+app: server.app:app
+port: 7860
+
 description: >
   A multi-task OpenEnv environment simulating a real-world AI customer support agent.
   The agent resolves support tickets by calling tools (search KB, check orders,
@@ -39,6 +44,8 @@ api:
   step: /step
   state: /state
   health: /health
+  metadata: /metadata
+  schema: /schema
 
 observation_space:
   type: dict
