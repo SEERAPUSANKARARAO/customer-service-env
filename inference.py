@@ -222,13 +222,39 @@ I will now search the knowledge base.        ← plain text, will be rejected
 # OpenEnv API helpers  (uses OPENENV_URL, NOT API_BASE_URL)
 # ===========================================================================
 
+def wait_for_server(max_wait: int = 60) -> bool:
+    """
+    Wait up to max_wait seconds for the OpenEnv server to be ready.
+    Returns True if server is healthy, False on timeout.
+    """
+    print(f"  [env] Waiting for server at {OPENENV_URL} ...", flush=True)
+    for i in range(max_wait):
+        try:
+            r = requests.get(f"{OPENENV_URL}/health", timeout=5)
+            if r.status_code == 200:
+                print(f"  [env] Server ready (after {i}s).", flush=True)
+                return True
+        except Exception:
+            pass
+        time.sleep(1)
+    print(f"  [ERROR] Server not ready after {max_wait}s at {OPENENV_URL}", flush=True)
+    return False
+
+
 def call_reset(task_id: str, seed: int = None) -> dict:
     payload = {"task_id": task_id}
     if seed is not None:
         payload["seed"] = seed
-    r = requests.post(f"{OPENENV_URL}/reset", json=payload, timeout=30)
-    r.raise_for_status()
-    return r.json()
+    for attempt in range(5):
+        try:
+            r = requests.post(f"{OPENENV_URL}/reset", json=payload, timeout=30)
+            r.raise_for_status()
+            return r.json()
+        except Exception as e:
+            wait = 3 * (attempt + 1)
+            print(f"  [WARN] /reset failed (attempt {attempt+1}/5): {e}. Retrying in {wait}s...", flush=True)
+            time.sleep(wait)
+    raise RuntimeError(f"Could not connect to OpenEnv server at {OPENENV_URL}/reset after 5 attempts.")
 
 
 def call_step(action: dict) -> dict:
@@ -436,26 +462,26 @@ def run_episode(task_id: str, seed: int = None, verbose: bool = True) -> float:
         print(f"  SEED : {seed}")
         print(f"{'='*60}")
 
-    # Reset environment
-    obs = call_reset(task_id=task_id, seed=seed)
-
-    if verbose:
-        t = obs.get("ticket", {})
-        print(f"  Ticket  : [{t.get('id')}] {t.get('subject')}")
-        print(f"  Customer: {t.get('customer_info', {}).get('name')}")
-        print()
-
-    # ── Mandatory structured log: episode start ───────────────────────────
-    log_start(task=task_id, model=MODEL_NAME)
-
     messages     = [{"role": "system", "content": SYSTEM_PROMPT}]
     final_score  = 0.0
     last_tool    = None
     loop_count   = 0
     step_rewards: List[float] = []
     steps_taken  = 0
+    obs          = {}
+
+    # ── Mandatory structured log: episode start ───────────────────────────
+    log_start(task=task_id, model=MODEL_NAME)
 
     try:
+        # Reset environment — inside try so [END] is always emitted on failure
+        obs = call_reset(task_id=task_id, seed=seed)
+
+        if verbose:
+            t = obs.get("ticket", {})
+            print(f"  Ticket  : [{t.get('id')}] {t.get('subject')}")
+            print(f"  Customer: {t.get('customer_info', {}).get('name')}")
+            print()
         for step_num in range(1, 30):   # hard cap at 29 steps
 
             # Build user message from current observation
@@ -593,6 +619,11 @@ def main():
     tasks   = ["easy", "medium", "hard"] if args.task == "all" else [args.task]
     scores  = {t: [] for t in tasks}
 
+    # Wait for the OpenEnv server to be ready before running any episodes
+    if not wait_for_server(max_wait=60):
+        print("[ERROR] OpenEnv server not reachable. Exiting.", flush=True)
+        sys.exit(1)
+
     for run_i in range(1, args.runs + 1):
         if args.runs > 1:
             print(f"\n{'-'*60}")
@@ -622,4 +653,10 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as e:
+        print(f"[FATAL] inference.py crashed: {e}", flush=True)
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)
