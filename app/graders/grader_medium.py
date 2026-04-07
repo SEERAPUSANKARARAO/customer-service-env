@@ -113,5 +113,6 @@ def grade(state: dict) -> dict:
     else:
         breakdown["rude_reply_penalty"] = 0.0
 
-    final_score = round(min(max(score, 0.0), 1.0), 4)
+    # Clamp strictly within (0, 1) — evaluator rejects 0.0 and 1.0 exactly
+    final_score = round(min(max(score, 0.01), 0.99), 4)
     return {"score": final_score, "breakdown": breakdown}
