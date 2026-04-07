@@ -25,7 +25,7 @@ except ImportError:
 
 # Reuse the agent from inference.py
 sys.path.insert(0, os.path.dirname(__file__))
-from inference import run_episode, MODEL_NAME, API_BASE_URL
+from inference import run_episode, MODEL_NAME, OPENENV_URL
 
 EVAL_SEEDS = [42, 100, 777, 1234, 9999]
 
@@ -33,12 +33,12 @@ EVAL_SEEDS = [42, 100, 777, 1234, 9999]
 def check_server():
     """Make sure the OpenEnv server is running before evaluating."""
     try:
-        r = requests.get(f"{API_BASE_URL}/health", timeout=5)
+        r = requests.get(f"{OPENENV_URL}/health", timeout=5)
         r.raise_for_status()
-        print(f"  [eval] Server OK: {API_BASE_URL}")
+        print(f"  [eval] Server OK: {OPENENV_URL}")
         return True
     except Exception as e:
-        print(f"\n  [ERROR] Cannot reach server at {API_BASE_URL}")
+        print(f"\n  [ERROR] Cannot reach server at {OPENENV_URL}")
         print(f"  Start it with: uvicorn app.main:app --host 0.0.0.0 --port 7860")
         return False
 
@@ -48,9 +48,9 @@ def evaluate_task(task_id: str, runs: int) -> dict:
     seeds  = EVAL_SEEDS[:runs]
     scores = []
 
-    print(f"\n  {'─'*50}")
+    print(f"\n  {'-'*50}")
     print(f"  Evaluating task: {task_id.upper()}  ({runs} runs)")
-    print(f"  {'─'*50}")
+    print(f"  {'-'*50}")
 
     for seed in seeds:
         score = run_episode(task_id=task_id, seed=seed, verbose=True)
@@ -78,32 +78,32 @@ def print_report(results: list):
     print(f"\n{'='*60}")
     print(f"  EVALUATION REPORT")
     print(f"  Model : {MODEL_NAME}")
-    print(f"  Server: {API_BASE_URL}")
+    print(f"  Server: {OPENENV_URL}")
     print(f"{'='*60}")
 
     overall_avgs = []
     for r in results:
-        bar     = "█" * int(r["avg"] * 20) + "░" * (20 - int(r["avg"] * 20))
-        status  = "✓ PASS" if r["passed"] else "✗ FAIL"
+        bar     = "#" * int(r["avg"] * 20) + "-" * (20 - int(r["avg"] * 20))
+        status  = "[PASS]" if r["passed"] else "[FAIL]"
         print(f"\n  {r['task_id'].upper():<8} {status}")
-        print(f"  [{bar}] avg={r['avg']:.4f}  min={r['min']:.4f}  max={r['max']:.4f}  σ={r['stddev']:.4f}")
+        print(f"  [{bar}] avg={r['avg']:.4f}  min={r['min']:.4f}  max={r['max']:.4f}  sd={r['stddev']:.4f}")
         print(f"  Scores per seed: " + "  ".join(
-            f"seed={s}→{sc:.2f}" for s, sc in zip(r["seeds"], r["scores"])
+            f"seed={s}->{sc:.2f}" for s, sc in zip(r["seeds"], r["scores"])
         ))
         overall_avgs.append(r["avg"])
 
     grand = sum(overall_avgs) / len(overall_avgs)
-    bar   = "█" * int(grand * 20) + "░" * (20 - int(grand * 20))
+    bar   = "#" * int(grand * 20) + "-" * (20 - int(grand * 20))
 
-    print(f"\n{'─'*60}")
+    print(f"\n{'-'*60}")
     print(f"  GRAND AVERAGE : [{bar}] {grand:.4f} / 1.0")
-    print(f"  OVERALL STATUS: {'✓ READY TO SUBMIT' if grand >= 0.7 else '✗ NEEDS IMPROVEMENT'}")
+    print(f"  OVERALL STATUS: {'[READY TO SUBMIT]' if grand >= 0.7 else '[NEEDS IMPROVEMENT]'}")
     print(f"{'='*60}\n")
 
     # Save JSON report
     report = {
         "model":         MODEL_NAME,
-        "server":        API_BASE_URL,
+        "server":        OPENENV_URL,
         "grand_average": grand,
         "tasks":         results,
     }

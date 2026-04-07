@@ -1,16 +1,15 @@
 """
 inference.py
 Baseline agent for the Customer Service OpenEnv.
-Uses the native Groq Python package (pip install groq).
-Supports automatic key rotation across up to 4 Groq API keys.
 
-Environment variables (set in .env or exported in terminal):
-  API_BASE_URL      — OpenEnv server URL     (default: http://localhost:7860)
-  MODEL_NAME        — Groq model name        (default: llama-3.3-70b-versatile)
-  GROQ_API_KEY_1    — first Groq key         (required)
-  GROQ_API_KEY_2    — second Groq key        (optional)
-  GROQ_API_KEY_3    — third Groq key         (optional)
-  GROQ_API_KEY_4    — fourth Groq key        (optional)
+Mandatory environment variables (set by evaluator):
+  API_BASE_URL  — LLM API endpoint   (e.g. https://router.huggingface.co/v1)
+  MODEL_NAME    — LLM model name     (e.g. llama-3.3-70b-versatile)
+  HF_TOKEN      — LLM API key
+
+Optional (local dev with Groq):
+  GROQ_API_KEY_1..4  — Groq keys used as fallback when HF_TOKEN is absent
+  OPENENV_URL        — OpenEnv server URL (default: http://localhost:7860)
 
 Usage:
   python inference.py                      # run all 3 tasks once
@@ -26,148 +25,132 @@ import json
 import time
 import argparse
 import requests
+from typing import Optional, List
 
 # ---------------------------------------------------------------------------
-# Auto-load .env file
+# Auto-load .env file (local dev only — silently skipped if not installed)
 # ---------------------------------------------------------------------------
 try:
     from dotenv import load_dotenv
     load_dotenv(override=False)
-    print("  [env] .env file loaded.")
 except ImportError:
-    pass  # fine — just use real environment variables
+    pass
 
 # ---------------------------------------------------------------------------
-# OpenAI client (pointed at Groq's OpenAI-compatible endpoint)
+# OpenAI client (required by OpenEnv spec)
 # ---------------------------------------------------------------------------
 try:
-    from openai import OpenAI, RateLimitError, APIStatusError
+    from openai import OpenAI
 except ImportError:
-    print("\n  [ERROR] The 'openai' package is not installed.")
-    print("  Fix: pip install openai\n")
+    print("[ERROR] The 'openai' package is not installed. Fix: pip install openai")
     sys.exit(1)
-
-GROQ_BASE_URL = "https://api.groq.com/openai/v1"
-
-
-# ===========================================================================
-# Groq key rotator
-# ===========================================================================
-
-class GroqKeyRotator:
-    """
-    Manages multiple Groq API keys and rotates on rate-limit errors.
-    Groq free tier: ~30 req/min per key, ~14 400 tokens/min per key.
-    With 4 keys you get ~120 req/min — plenty for this environment.
-    """
-
-    def __init__(self):
-        self.keys = []
-
-        # Collect keys from GROQ_API_KEY_1 … GROQ_API_KEY_4
-        for i in range(1, 5):
-            k = os.getenv(f"GROQ_API_KEY_{i}", "").strip()
-            if k:
-                self.keys.append(k)
-
-        # Also accept the bare GROQ_API_KEY variable
-        bare = os.getenv("GROQ_API_KEY", "").strip()
-        if bare and bare not in self.keys:
-            self.keys.insert(0, bare)
-
-        if not self.keys:
-            print("\n  [ERROR] No Groq API key found.")
-            print("  Set GROQ_API_KEY_1=gsk_... in your .env file or terminal.")
-            print("  Get keys at: https://console.groq.com/keys\n")
-            sys.exit(1)
-
-        self._clients = [OpenAI(api_key=k, base_url=GROQ_BASE_URL) for k in self.keys]
-        self._index   = 0
-
-        print(f"  [Groq] {len(self.keys)} key(s) loaded.")
-        for i, k in enumerate(self.keys):
-            print(f"         key {i+1}: {k[:8]}...{k[-4:]}")
-
-    @property
-    def client(self) -> OpenAI:
-        return self._clients[self._index]
-
-    def rotate(self):
-        self._index = (self._index + 1) % len(self.keys)
-        print(f"  [Groq] Switched to key #{self._index + 1}")
-
-    def chat(self, messages: list, model: str,
-             max_tokens: int = 500, temperature: float = 0.1,
-             retries: int = 6) -> str:
-        """
-        Send a chat request to Groq. On rate-limit or server errors,
-        rotates to the next key and retries with exponential back-off.
-        Returns the model's response text.
-        """
-        last_error = None
-
-        for attempt in range(retries):
-            try:
-                response = self.client.chat.completions.create(
-                    model=model,
-                    messages=messages,
-                    max_tokens=max_tokens,
-                    temperature=temperature,
-                )
-                return response.choices[0].message.content or ""
-
-            except RateLimitError as e:
-                last_error = e
-                wait = 2 ** attempt
-                print(f"  [Groq] Rate limit on key #{self._index+1}. "
-                      f"Rotating + waiting {wait}s... (attempt {attempt+1}/{retries})")
-                self.rotate()
-                time.sleep(wait)
-
-            except APIStatusError as e:
-                last_error = e
-                # 400 organization_restricted — this key won't work, rotate immediately
-                if e.status_code == 400 and "restricted" in str(e).lower():
-                    print(f"  [Groq] Key #{self._index+1} is restricted. Rotating...")
-                    self.rotate()
-                    time.sleep(1)
-                elif e.status_code in (429, 503, 529):
-                    wait = 2 ** attempt
-                    print(f"  [Groq] HTTP {e.status_code} on key #{self._index+1}. "
-                          f"Rotating + waiting {wait}s...")
-                    self.rotate()
-                    time.sleep(wait)
-                else:
-                    raise
-
-            except Exception as e:
-                last_error = e
-                print(f"  [Groq] Unexpected error: {e}. Retrying in 3s...")
-                time.sleep(3)
-
-        raise RuntimeError(
-            f"All {retries} Groq attempts failed. Last error: {last_error}\n"
-            f"  → Check your keys at https://console.groq.com/keys"
-        )
 
 
 # ===========================================================================
 # Configuration
 # ===========================================================================
 
-API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:7860").rstrip("/")
+# ── LLM (mandatory evaluator variables) ────────────────────────────────────
+# API_BASE_URL = LLM endpoint (set by evaluator, e.g. HF inference router)
+# Default falls back to Groq for local development
+LLM_BASE_URL = os.getenv("API_BASE_URL", "https://api.groq.com/openai/v1").rstrip("/")
 MODEL_NAME   = os.getenv("MODEL_NAME",   "llama-3.3-70b-versatile")
 
-# Initialise key rotator (exits with a clear message if no keys found)
-rotator = GroqKeyRotator()
+# API key priority:
+#   Groq endpoint  → prefer GROQ_API_KEY_* (local dev)
+#   HF/other endpoint → prefer HF_TOKEN (evaluator)
+_groq_keys = [
+    os.getenv("GROQ_API_KEY_1", ""),
+    os.getenv("GROQ_API_KEY_2", ""),
+    os.getenv("GROQ_API_KEY_3", ""),
+    os.getenv("GROQ_API_KEY_4", ""),
+    os.getenv("GROQ_API_KEY",   ""),
+]
+_groq_key  = next((k for k in _groq_keys if k.strip()), "")
+_hf_token  = os.getenv("HF_TOKEN", "").strip()
 
-print(f"  [env] Server : {API_BASE_URL}")
-print(f"  [env] Model  : {MODEL_NAME}")
+if "groq.com" in LLM_BASE_URL.lower():
+    _API_KEY = _groq_key or _hf_token   # Groq endpoint → Groq key first
+else:
+    _API_KEY = _hf_token or _groq_key   # HF/other endpoint → HF_TOKEN first
+
+if not _API_KEY:
+    print("[WARN] No API key found (HF_TOKEN or GROQ_API_KEY_1..4). LLM calls will fail at runtime.")
+    _API_KEY = "none"
+
+# ── OpenEnv server URL ──────────────────────────────────────────────────────
+# SEPARATE from API_BASE_URL — the evaluator runs the env container at localhost:7860
+OPENENV_URL = os.getenv("OPENENV_URL", "http://localhost:7860").rstrip("/")
+
+# ── OpenAI client ───────────────────────────────────────────────────────────
+_client = OpenAI(base_url=LLM_BASE_URL, api_key=_API_KEY)
+
+print(f"  [env] LLM URL  : {LLM_BASE_URL}")
+print(f"  [env] Model    : {MODEL_NAME}")
+print(f"  [env] Env URL  : {OPENENV_URL}")
+print(f"  [env] API key  : {'set (' + _API_KEY[:8] + '...)' if _API_KEY != 'none' else 'NOT SET'}")
 print()
 
 
 # ===========================================================================
-# System prompt — tuned for Llama 3.3 on Groq
+# LLM call with retry
+# ===========================================================================
+
+def call_llm(messages: list, max_tokens: int = 500, temperature: float = 0.1) -> str:
+    """
+    Call the LLM via OpenAI-compatible client.
+    Retries up to 5 times with exponential back-off on errors.
+    """
+    last_error = None
+    for attempt in range(5):
+        try:
+            resp = _client.chat.completions.create(
+                model       = MODEL_NAME,
+                messages    = messages,
+                max_tokens  = max_tokens,
+                temperature = temperature,
+            )
+            return resp.choices[0].message.content or ""
+        except Exception as e:
+            last_error = e
+            wait = 2 ** attempt
+            print(f"  [LLM] Error (attempt {attempt+1}/5): {e}. Retrying in {wait}s...")
+            time.sleep(wait)
+    raise RuntimeError(f"All LLM attempts failed. Last error: {last_error}")
+
+
+# ===========================================================================
+# Structured stdout logging  ← required by OpenEnv submission spec
+# ===========================================================================
+
+ENV_NAME = "customer-service-env"
+
+
+def log_start(task: str, model: str) -> None:
+    print(f"[START] task={task} env={ENV_NAME} model={model}", flush=True)
+
+
+def log_step(step: int, action: dict, reward: float, done: bool, error) -> None:
+    params_compact = json.dumps(action.get("params", {}), separators=(",", ":"))
+    action_str = f"{action.get('tool')}({params_compact})"
+    error_val  = error if error else "null"
+    done_val   = str(done).lower()
+    print(
+        f"[STEP] step={step} action={action_str} reward={reward:.2f} done={done_val} error={error_val}",
+        flush=True,
+    )
+
+
+def log_end(success: bool, steps: int, score: float, rewards: List[float]) -> None:
+    rewards_str = ",".join(f"{r:.2f}" for r in rewards)
+    print(
+        f"[END] success={str(success).lower()} steps={steps} score={score:.3f} rewards={rewards_str}",
+        flush=True,
+    )
+
+
+# ===========================================================================
+# System prompt — tuned for reliable JSON tool-call output
 # ===========================================================================
 
 SYSTEM_PROMPT = """You are a professional and empathetic AI customer support agent.
@@ -236,20 +219,20 @@ I will now search the knowledge base.        ← plain text, will be rejected
 
 
 # ===========================================================================
-# Environment API helpers
+# OpenEnv API helpers  (uses OPENENV_URL, NOT API_BASE_URL)
 # ===========================================================================
 
 def call_reset(task_id: str, seed: int = None) -> dict:
     payload = {"task_id": task_id}
     if seed is not None:
         payload["seed"] = seed
-    r = requests.post(f"{API_BASE_URL}/reset", json=payload, timeout=30)
+    r = requests.post(f"{OPENENV_URL}/reset", json=payload, timeout=30)
     r.raise_for_status()
     return r.json()
 
 
 def call_step(action: dict) -> dict:
-    r = requests.post(f"{API_BASE_URL}/step", json=action, timeout=30)
+    r = requests.post(f"{OPENENV_URL}/step", json=action, timeout=30)
     r.raise_for_status()
     return r.json()
 
@@ -278,11 +261,9 @@ def build_user_message(obs: dict) -> str:
     if ticket.get("sentiment"):
         lines.append(f"Customer sentiment: {ticket['sentiment']}")
 
-    # Show order ID if present in the ticket (hard task provides it upfront)
     if ticket.get("order_id"):
         lines.append(f"Order ID on file: {ticket['order_id']}")
 
-    # Last 6 conversation turns (keeps prompt within token limits)
     lines += ["", "=== CONVERSATION ==="]
     recent = conv[-6:] if len(conv) > 6 else conv
     for msg in recent:
@@ -290,26 +271,22 @@ def build_user_message(obs: dict) -> str:
         content = msg.get("content", "")
         lines.append(f"[{role}]: {content}")
 
-    # Result of the last tool call (very important feedback for the agent)
     if tool_result is not None:
         lines += ["", "=== LAST TOOL RESULT ===", json.dumps(tool_result, indent=2)]
 
-    # Any notes added to the ticket
     if ticket.get("notes"):
         lines += ["", "=== TICKET NOTES ==="]
         for note in ticket["notes"]:
             lines.append(f"  • {note}")
 
-    # Error from last action — make it prominent so the agent self-corrects
     if info.get("error"):
         lines += [
             "",
-            "=== ⚠️  ERROR FROM LAST ACTION ===",
+            "=== ERROR FROM LAST ACTION ===",
             info["error"],
             f"You MUST only use tools from: {', '.join(avail)}",
         ]
 
-    # Detect task type and context
     is_faq_task     = "get_order_details" not in avail
     already_replied = any(m.get("role") == "agent" for m in conv)
     sentiment       = ticket.get("sentiment", "")
@@ -319,18 +296,15 @@ def build_user_message(obs: dict) -> str:
                   "THREATENING", "OUTRAGEOUS", "ABSOLUTE"]
     )
 
-    # Premium customer escalation: fires AFTER refund is issued for a premium customer.
-    # This overrides the generic close_ticket hint so the agent escalates before closing.
-    refund_done      = ticket.get("refund_issued", 0.0) > 0
-    premium_tier     = ticket.get("customer_info", {}).get("tier", "regular") == "premium"
-    needs_escalate   = (
+    refund_done    = ticket.get("refund_issued", 0.0) > 0
+    premium_tier   = ticket.get("customer_info", {}).get("tier", "regular") == "premium"
+    needs_escalate = (
         "escalate_to_human" in avail
         and already_replied
         and premium_tier
         and refund_done
     )
 
-    # Build closing hint — priority order matters
     if is_faq_task and not already_replied:
         closing_hint = (
             "FAQ TICKET — No order lookup available. "
@@ -340,23 +314,19 @@ def build_user_message(obs: dict) -> str:
     elif is_faq_task and already_replied:
         closing_hint = (
             "FAQ TICKET — DONE: You have already replied to the customer. "
-            "There is nothing more to investigate. Call close_ticket RIGHT NOW. "
-            "Do NOT ask questions. Do NOT look up orders. Just call close_ticket."
+            "Call close_ticket RIGHT NOW. Do NOT ask questions. Do NOT look up orders."
         )
     elif needs_escalate:
         closing_hint = (
-            "⚠️  PREMIUM CUSTOMER — refund processed. "
+            "PREMIUM CUSTOMER — refund processed. "
             "Your NEXT action MUST be escalate_to_human (NOT close_ticket). "
-            "Reason: premium customers require senior support follow-up after resolution. "
-            "Use reason: 'Premium customer with unresolved issue requires senior support attention.'"
+            "Reason: premium customers require senior support follow-up after resolution."
         )
     elif already_replied and "close_ticket" in avail:
         closing_hint = (
             "You have already replied to the customer. "
-            "If the issue is fully resolved (order status communicated, refund issued, or question answered), "
-            "call close_ticket. "
-            "If there is still more to investigate (order not yet checked, status not communicated), "
-            "continue investigating first — then close_ticket as your final action."
+            "If the issue is fully resolved, call close_ticket. "
+            "If there is still more to investigate, continue first — then close_ticket."
         )
     elif is_angry and not already_replied and "send_reply" in avail:
         closing_hint = (
@@ -389,7 +359,7 @@ def parse_action(raw: str, available_tools: list) -> dict:
     """
     raw = raw.strip()
 
-    # 1. Strip markdown code fences  ```json ... ``` or ``` ... ```
+    # 1. Strip markdown code fences
     if "```" in raw:
         parts = raw.split("```")
         if len(parts) >= 3:
@@ -439,12 +409,12 @@ def parse_action(raw: str, available_tools: list) -> dict:
                 "params": {"reason": "Customer requires human assistance"}}
 
     # 5. Final fallback
-    print(f"  [WARN] Could not parse model output into JSON. Using fallback.")
+    print(f"  [WARN] Could not parse model output. Using fallback.")
     print(f"  [RAW ] {raw[:300]}")
     return {
         "tool": "send_reply",
         "params": {
-            "message": "Thank you for reaching out. I'm reviewing your case carefully and will assist you shortly.",
+            "message": "Thank you for reaching out. I'm reviewing your case and will assist you shortly.",
             "tone": "professional",
         }
     }
@@ -475,91 +445,113 @@ def run_episode(task_id: str, seed: int = None, verbose: bool = True) -> float:
         print(f"  Customer: {t.get('customer_info', {}).get('name')}")
         print()
 
-    messages    = [{"role": "system", "content": SYSTEM_PROMPT}]
-    final_score = 0.0
-    last_tool   = None
-    loop_count  = 0
+    # ── Mandatory structured log: episode start ───────────────────────────
+    log_start(task=task_id, model=MODEL_NAME)
 
-    for step_num in range(1, 30):   # hard cap at 29 steps
+    messages     = [{"role": "system", "content": SYSTEM_PROMPT}]
+    final_score  = 0.0
+    last_tool    = None
+    loop_count   = 0
+    step_rewards: List[float] = []
+    steps_taken  = 0
 
-        # Build user message from current observation
-        user_msg = build_user_message(obs)
-        messages.append({"role": "user", "content": user_msg})
+    try:
+        for step_num in range(1, 30):   # hard cap at 29 steps
 
-        # Call Groq
-        try:
-            raw = rotator.chat(
-                messages    = messages,
-                model       = MODEL_NAME,
-                max_tokens  = 500,
-                temperature = 0.1,   # low = consistent JSON output
-            )
-            messages.append({"role": "assistant", "content": raw})
-        except Exception as e:
-            print(f"  [ERROR] Groq call failed at step {step_num}: {e}")
-            break
+            # Build user message from current observation
+            user_msg = build_user_message(obs)
+            messages.append({"role": "user", "content": user_msg})
 
-        # Parse action
-        avail  = obs.get("available_tools", [])
-        action = parse_action(raw, avail)
+            # Call LLM
+            try:
+                raw = call_llm(messages=messages, max_tokens=500, temperature=0.1)
+                messages.append({"role": "assistant", "content": raw})
+            except Exception as e:
+                print(f"  [ERROR] LLM call failed at step {step_num}: {e}")
+                log_step(step=step_num, action={"tool": "none", "params": {}},
+                         reward=0.0, done=True, error=str(e))
+                step_rewards.append(0.0)
+                steps_taken = step_num
+                break
 
-        # Stuck-loop guard — force close if same tool called 3 times in a row
-        if action["tool"] == last_tool:
-            loop_count += 1
-        else:
-            loop_count = 0
-        last_tool = action["tool"]
+            # Parse action
+            avail  = obs.get("available_tools", [])
+            action = parse_action(raw, avail)
 
-        if loop_count >= 3:
-            print(f"  [WARN] Stuck calling '{action['tool']}' repeatedly. Forcing close_ticket.")
-            action     = {
-                "tool": "close_ticket",
-                "params": {"final_message": "Your case has been reviewed and appropriate action has been taken. Thank you for your patience."}
-            }
-            loop_count = 0
-
-        # Print step summary
-        if verbose:
-            params_str = json.dumps(action.get("params", {}))
-            if len(params_str) > 85:
-                params_str = params_str[:82] + "..."
-            print(f"  Step {step_num:02d} | {action.get('tool'):<22} | {params_str}")
-
-        # Execute in environment
-        try:
-            obs = call_step(action)
-        except Exception as e:
-            print(f"  [ERROR] /step call failed: {e}")
-            break
-
-        reward = obs.get("reward", 0.0)
-        done   = obs.get("done",   False)
-        info   = obs.get("info",   {})
-        final_score = reward
-
-        # Print reward info
-        if verbose:
-            if "grader_breakdown" in info:
-                print(f"         → FINAL SCORE : {reward:.4f} / 1.0")
-                for k, v in info["grader_breakdown"].items():
-                    if v != 0:
-                        sign = "+" if v > 0 else ""
-                        print(f"           {sign}{v:.2f}  {k}")
+            # Stuck-loop guard — force close if same tool called 3 times in a row
+            if action["tool"] == last_tool:
+                loop_count += 1
             else:
-                print(f"         → partial reward: {reward:.4f}")
+                loop_count = 0
+            last_tool = action["tool"]
 
-        if done:
+            if loop_count >= 3:
+                print(f"  [WARN] Stuck calling '{action['tool']}' repeatedly. Forcing close_ticket.")
+                action     = {
+                    "tool": "close_ticket",
+                    "params": {"final_message": "Your case has been reviewed and action has been taken. Thank you for your patience."}
+                }
+                loop_count = 0
+
+            # Print step summary
             if verbose:
-                print(f"\n  ✓ Episode finished in {step_num} step(s).")
-                print(f"  Final score: {final_score:.4f} / 1.0")
-            break
+                params_str = json.dumps(action.get("params", {}))
+                if len(params_str) > 85:
+                    params_str = params_str[:82] + "..."
+                print(f"  Step {step_num:02d} | {action.get('tool'):<22} | {params_str}")
 
-        # Small sleep — respects Groq rate limits on free tier
-        time.sleep(0.5)
+            # Execute in environment
+            step_error: Optional[str] = None
+            try:
+                obs = call_step(action)
+            except Exception as e:
+                print(f"  [ERROR] /step call failed: {e}")
+                step_error = str(e)
+                log_step(step=step_num, action=action, reward=0.0, done=True, error=step_error)
+                step_rewards.append(0.0)
+                steps_taken = step_num
+                break
 
-    else:
-        if verbose:
-            print(f"\n  ✗ Hit step cap (29). Last score: {final_score:.4f}")
+            reward     = obs.get("reward", 0.0)
+            done       = obs.get("done",   False)
+            info       = obs.get("info",   {})
+            final_score = reward
+            step_error  = info.get("error") or None
+
+            step_rewards.append(reward)
+            steps_taken = step_num
+
+            # ── Mandatory structured log: one line per step ───────────────
+            log_step(step=step_num, action=action, reward=reward, done=done, error=step_error)
+
+            # Print reward info
+            if verbose:
+                if "grader_breakdown" in info:
+                    print(f"         -> FINAL SCORE : {reward:.4f} / 1.0")
+                    for k, v in info["grader_breakdown"].items():
+                        if v != 0:
+                            sign = "+" if v > 0 else ""
+                            print(f"           {sign}{v:.2f}  {k}")
+                else:
+                    print(f"         -> partial reward: {reward:.4f}")
+
+            if done:
+                if verbose:
+                    print(f"\n  [DONE] Episode finished in {step_num} step(s).")
+                    print(f"  Final score: {final_score:.4f} / 1.0")
+                break
+
+            # Small sleep — avoids rate-limit spikes
+            time.sleep(0.5)
+
+        else:
+            if verbose:
+                print(f"\n  [CAP] Hit step cap (29). Last score: {final_score:.4f}")
+
+    finally:
+        # ── Mandatory structured log: always emitted, even on exception ───
+        success = final_score >= 0.7   # matches reward_threshold in openenv.yaml
+        log_end(success=success, steps=steps_taken, score=final_score, rewards=step_rewards)
 
     return final_score
 
@@ -570,7 +562,7 @@ def run_episode(task_id: str, seed: int = None, verbose: bool = True) -> float:
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Customer Service OpenEnv — Groq-native baseline agent"
+        description="Customer Service OpenEnv — baseline agent"
     )
     parser.add_argument(
         "--task",
@@ -603,7 +595,7 @@ def main():
 
     for run_i in range(1, args.runs + 1):
         if args.runs > 1:
-            print(f"\n{'─'*60}")
+            print(f"\n{'-'*60}")
             print(f"  RUN {run_i} / {args.runs}")
         for task_id in tasks:
             seed  = args.seed if args.seed is not None else run_i * 100
@@ -618,7 +610,7 @@ def main():
     for task_id in tasks:
         avg   = sum(scores[task_id]) / len(scores[task_id])
         overall.append(avg)
-        bar   = "█" * int(avg * 20) + "░" * (20 - int(avg * 20))
+        bar   = "#" * int(avg * 20) + "-" * (20 - int(avg * 20))
         extra = f"   runs={[round(s, 4) for s in scores[task_id]]}" if len(scores[task_id]) > 1 else ""
         print(f"  {task_id:<8} [{bar}] {avg:.4f}{extra}")
 

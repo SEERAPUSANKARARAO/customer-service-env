@@ -96,6 +96,62 @@ Grand average: 1.0000 / 1.0
 
 ---
 
+## Action Space
+
+Each action is a JSON object with two fields:
+
+```json
+{
+  "tool": "<tool_name>",
+  "params": { "<param_key>": "<param_value>" }
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `tool` | string | Name of the tool to call (see Available Tools below) |
+| `params` | object | Tool-specific parameters |
+
+Example:
+```json
+{"tool": "search_kb", "params": {"query": "password reset"}}
+{"tool": "issue_refund", "params": {"amount": 79.99, "reason": "Item lost in transit"}}
+{"tool": "close_ticket", "params": {"final_message": "Issue resolved. Thank you!"}}
+```
+
+---
+
+## Observation Space
+
+Each step returns a JSON observation with these fields:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `ticket` | object | Current ticket state (id, subject, status, customer_info, notes, refund_issued) |
+| `conversation` | array | Full conversation history (role + content per message) |
+| `available_tools` | array | Tools the agent can call in this task |
+| `step_count` | integer | Number of steps taken so far |
+| `done` | boolean | Whether the episode has ended |
+| `reward` | float | Reward for this step (0.0–1.0; final score when done=true) |
+| `tool_result` | object | Result returned by the last tool call |
+| `info` | object | Extra info: `grader_breakdown` (on done), `error` (on invalid action) |
+
+Example observation:
+```json
+{
+  "ticket": {"id": "TKT-E001", "subject": "Password Reset", "status": "open", ...},
+  "conversation": [{"role": "customer", "content": "I forgot my password"}],
+  "available_tools": ["search_kb", "send_reply", "close_ticket"],
+  "step_count": 1,
+  "done": false,
+  "reward": 0.05,
+  "tool_result": {"found": true, "answer": "Reset link sent within 30 minutes..."},
+  "info": {"partial_reward": 0.05}
+}
+```
+
+---
+
 ## API
 
 | Endpoint | Method | Description |

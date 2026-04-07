@@ -7,16 +7,12 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-# HF Spaces passes secrets as environment variables at runtime.
-# Declare them here so they're visible to the container.
-# You set the actual values in: HF Space → Settings → Variables and secrets
-ENV API_BASE_URL=http://localhost:7860
+# Non-sensitive defaults only — secrets (HF_TOKEN, GROQ_API_KEY_*) must be
+# injected at runtime via HF Space → Settings → Variables and secrets.
+# Never bake secret values into the image.
+ENV API_BASE_URL=https://api.groq.com/openai/v1
 ENV MODEL_NAME=llama-3.3-70b-versatile
-ENV GROQ_API_KEY_1=""
-ENV GROQ_API_KEY_2=""
-ENV GROQ_API_KEY_3=""
-ENV GROQ_API_KEY_4=""
-ENV HF_TOKEN=""
+ENV OPENENV_URL=http://localhost:7860
 
 EXPOSE 7860
 
