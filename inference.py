@@ -463,7 +463,7 @@ def run_episode(task_id: str, seed: int = None, verbose: bool = True) -> float:
         print(f"{'='*60}")
 
     messages     = [{"role": "system", "content": SYSTEM_PROMPT}]
-    final_score  = 0.0
+    final_score  = 0.01
     last_tool    = None
     loop_count   = 0
     step_rewards: List[float] = []
@@ -495,8 +495,8 @@ def run_episode(task_id: str, seed: int = None, verbose: bool = True) -> float:
             except Exception as e:
                 print(f"  [ERROR] LLM call failed at step {step_num}: {e}")
                 log_step(step=step_num, action={"tool": "none", "params": {}},
-                         reward=0.0, done=True, error=str(e))
-                step_rewards.append(0.0)
+                         reward=0.01, done=True, error=str(e))
+                step_rewards.append(0.01)
                 steps_taken = step_num
                 break
 
@@ -533,8 +533,8 @@ def run_episode(task_id: str, seed: int = None, verbose: bool = True) -> float:
             except Exception as e:
                 print(f"  [ERROR] /step call failed: {e}")
                 step_error = str(e)
-                log_step(step=step_num, action=action, reward=0.0, done=True, error=step_error)
-                step_rewards.append(0.0)
+                log_step(step=step_num, action=action, reward=0.01, done=True, error=step_error)
+                step_rewards.append(0.01)
                 steps_taken = step_num
                 break
 
