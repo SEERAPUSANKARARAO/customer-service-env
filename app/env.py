@@ -42,7 +42,7 @@ class CustomerServiceEnv:
         self._state["tools_used"] = []
         self._state["done"] = False
 
-        return self._build_observation(reward=0.0, done=False, tool_result=None, info={})
+        return self._build_observation(reward=0.01, done=False, tool_result=None, info={})
 
     def step(self, action: dict) -> dict:
         """
@@ -62,7 +62,7 @@ class CustomerServiceEnv:
         # Validate tool
         if tool not in self._available_tools:
             obs = self._build_observation(
-                reward=-0.05,
+                reward=0.01,
                 done=False,
                 tool_result=None,
                 info={"error": f"Tool '{tool}' is not available. Available: {self._available_tools}"},
@@ -72,7 +72,7 @@ class CustomerServiceEnv:
 
         if tool not in TOOL_MAP:
             obs = self._build_observation(
-                reward=-0.05,
+                reward=0.01,
                 done=False,
                 tool_result=None,
                 info={"error": f"Unknown tool '{tool}'."},
@@ -85,7 +85,7 @@ class CustomerServiceEnv:
             tool_result, self._state = TOOL_MAP[tool](self._state, params)
         except Exception as e:
             obs = self._build_observation(
-                reward=-0.05,
+                reward=0.01,
                 done=False,
                 tool_result=None,
                 info={"error": f"Tool execution error: {str(e)}"},
@@ -158,7 +158,8 @@ class CustomerServiceEnv:
             if "issue_refund" in tools_used:                   score += 0.08
             if "ask_clarification" in tools_used:              score += 0.02
 
-        return round(min(score, 0.30), 4)  # partial reward capped at 0.30
+        # Clamp strictly within (0, 1) — evaluator rejects 0.0 and 1.0 exactly
+        return round(min(max(score, 0.01), 0.30), 4)
 
     def _build_observation(self, reward: float, done: bool,
                            tool_result, info: dict) -> dict:
@@ -180,7 +181,7 @@ class CustomerServiceEnv:
             "available_tools": self._available_tools,
             "step_count": self._state.get("step_count", 0),
             "done": self._state.get("done", False),
-            "reward": 0.0,
+            "reward": 0.01,
             "tool_result": None,
             "info": {"error": message},
         }
